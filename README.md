@@ -1,4 +1,4 @@
-# SpringBoot 项目初始模板
+# SpringBoot 项目的初始模板
 
 ## 模板特点
 

@@ -37,6 +37,11 @@ public class Integral implements Serializable {
     private Integer signInToday;
 
     /**
+     * 补签
+     */
+    private Integer signInYesterday;
+
+    /**
      * 连续签到天数
      */
     private Integer signInCount;

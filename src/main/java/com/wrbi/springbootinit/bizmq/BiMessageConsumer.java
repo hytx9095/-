@@ -57,8 +57,8 @@ public class BiMessageConsumer {
             return;
         }
         // 调用 AI
-        String result = aiManager.doChat(CommonConstant.BI_MODEL_ID, buildUserInput(chart));
-//        String result = aiManager.sendMesToAIUseXingHuo(buildUserInput(chart));
+//        String result = aiManager.doChat(CommonConstant.BI_MODEL_ID, buildUserInput(chart));
+        String result = aiManager.sendMesToAIUseXingHuo(buildUserInput(chart));
         String[] splits = result.split("【【【【【");
         if (splits.length < 3) {
             channel.basicNack(deliveryTag, false, false);
@@ -80,6 +80,7 @@ public class BiMessageConsumer {
         //扣减积分
         boolean res = integralService.genChartByIntegral(chart.getUserId());
         if (!res) {
+            channel.basicNack(deliveryTag, false, false);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "积分扣减失败！");
         }
         // 消息确认

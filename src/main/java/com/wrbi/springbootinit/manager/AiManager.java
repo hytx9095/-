@@ -74,7 +74,7 @@ public class AiManager {
                     "【【【【【\n" +
                     "{前端 Echarts V5 的 option 配置对象json代码（注意不要使用单引号，全部都使用双引号；可以下载为图片），合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
                     "【【【【【\n" +
-                    "{明确的数据分析结论、越详细越好，不要生成多余的注释}\n" +
+                    "{明确的数据分析结论、越详细越好，不要生成多余的注释，至少300字}\n" +
                     "示例如下：\n" +
                     EXAMPLE;
 
@@ -93,7 +93,6 @@ public class AiManager {
         if (response == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 响应错误");
         }
-        System.out.println(response + "==========================mikasa");
         return response.getData().getContent();
     }
 

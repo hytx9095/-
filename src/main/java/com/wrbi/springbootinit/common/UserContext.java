@@ -3,7 +3,9 @@ package com.wrbi.springbootinit.common;
 public class UserContext {
     //为每一个线程都提供了一个独立的变量副本。
     //用于在多线程环境中存储线程局部变量，每个线程可以独立访问自己的副本，不会相互影响
-    private static final ThreadLocal<Long> tl = new ThreadLocal<>();
+//    private static final ThreadLocal<Long> tl = new ThreadLocal<>();
+    private static final ThreadLocal<Long> tl = ThreadLocal.withInitial(() -> 0L);
+
 
     /**
      * 保存当前登录用户信息到ThreadLocal

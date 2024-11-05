@@ -255,8 +255,6 @@ public class ChartController {
         User loginUser = userService.getLoginUser(request);
         // 限流判断，每个用户一个限流器
         redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
-        // 无需写 prompt，直接调用现有模型
-        long biModelId = CommonConstant.BI_MODEL_ID;
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
         userInput.append("分析需求：").append("\n");
@@ -271,8 +269,8 @@ public class ChartController {
         String csvData = ExcelUtils.excelToCsv(multipartFile);
         userInput.append(csvData).append("\n");
         // 调用 AI
-        String result = aiManager.doChat(biModelId, userInput.toString());
-//        String result = aiManager.sendMesToAIUseXingHuo(userInput.toString());
+//        String result = aiManager.doChat(CommonConstant.BI_MODEL_ID, userInput.toString());
+        String result = aiManager.sendMesToAIUseXingHuo(userInput.toString());
         String[] splits = result.split("【【【【【");
         if (splits.length < 3) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
@@ -359,7 +357,7 @@ public class ChartController {
         chart.setUserId(loginUser.getId());
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
-        // todo 建议处理任务队列满了后，抛异常的情况
+        // 异步执行
         genByAsync(chart, userInput);
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(chart.getId());
@@ -404,7 +402,7 @@ public class ChartController {
         chart.setStatus(ChartStatusEnum.WAIT.getValue());
         boolean saveResult = chartService.updateById(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
-        // todo 建议处理任务队列满了后，抛异常的情况
+        // 异步执行
         genByAsync(chart, userInput);
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(chart.getId());
@@ -473,6 +471,7 @@ public class ChartController {
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
         long newChartId = chart.getId();
+        // 消息队列发送消息
         biMessageProducer.sendMessage(String.valueOf(newChartId));
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(newChartId);
@@ -570,8 +569,8 @@ public class ChartController {
                 return;
             }
             // 调用 AI
-            String result = aiManager.doChat(CommonConstant.BI_MODEL_ID, userInput.toString());
-//            String result = aiManager.sendMesToAIUseXingHuo(userInput.toString());
+//            String result = aiManager.doChat(CommonConstant.BI_MODEL_ID, userInput.toString());
+            String result = aiManager.sendMesToAIUseXingHuo(userInput.toString());
             String[] splits = result.split("【【【【【");
             if (splits.length < 3) {
                 handleChartUpdateError(chart.getId(), "AI 生成错误");

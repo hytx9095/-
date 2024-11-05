@@ -26,7 +26,7 @@ public interface EmailConstant {
     String STARTTLS = "true";
 
     //邮件主题
-    String SUBJECT = "智能图表分析系统登录验证码";
+    String SUBJECT = "智能数据分析与图表生成系统登录验证码";
 
     //邮件内容
     String TEXT = "验证码";

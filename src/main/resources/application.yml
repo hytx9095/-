@@ -16,15 +16,15 @@ spring:
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/wrbi
-#    url: jdbc:mysql://118.25.228.235:3307/wrbi
+#    url: jdbc:mysql://localhost:3306/wrbi
+    url: jdbc:mysql://118.25.228.235:3307/wrbi
     username: root
     password: 123
   # Redis 配置
   redis:
-    database: 1
-    host: localhost
-#    host: 118.25.228.235
+    database: 0
+#    host: localhost
+    host: 118.25.228.235
     port: 6379
     timeout: 5000
     password: 123123
@@ -34,8 +34,8 @@ spring:
       # 大小限制
       max-file-size: 10MB
   rabbitmq:
-    host: localhost
-#    host: 118.25.228.235
+#    host: localhost
+    host: 118.25.228.235
     port: 5672
     password: guest
     username: guest

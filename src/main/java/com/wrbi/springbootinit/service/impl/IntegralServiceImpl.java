@@ -1,5 +1,7 @@
 package com.wrbi.springbootinit.service.impl;
 
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wrbi.springbootinit.common.ErrorCode;
 import com.wrbi.springbootinit.common.ResultUtils;
@@ -12,6 +14,7 @@ import com.wrbi.springbootinit.model.entity.Integral;
 import com.wrbi.springbootinit.model.entity.IntegralLog;
 import com.wrbi.springbootinit.model.enums.IntegralEnum;
 import com.wrbi.springbootinit.model.enums.IntegralTypeEnum;
+import com.wrbi.springbootinit.model.enums.ReSignInEnum;
 import com.wrbi.springbootinit.service.IntegralLogService;
 import com.wrbi.springbootinit.service.IntegralService;
 import com.wrbi.springbootinit.mapper.IntegralMapper;
@@ -23,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,12 +50,11 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean signIn() {
+    public boolean signIn(int month, int day, boolean isReSignIn) {
+
         long userId = UserContext.getUserId();
         //位图key
-        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), userId);
-        //当天的日期
-        long day = Long.parseLong(LocalDate.now().format(DateTimeFormatter.ofPattern("dd")));
+        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), month, userId);
         //检测是否用户今日签到过,用getBit可以取出该用户具体日期的签到状态(位图的值只有两个,1或者0,这里1代表true)
         if (stringRedisTemplate.opsForValue().getBit(signKey, day)) {
             return false;
@@ -60,20 +63,26 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
         if (setResult){
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "签到失败");
         }
-
         //保存积分记录
         IntegralLog integralLog = new IntegralLog();
         int signInCount = getSignInCount();
         integralLog.setUserId(userId);
-        if (signInCount % 5 == 0){
-            integralLog.setIntegralType(IntegralTypeEnum.CONTINUOUS_SIGN_IN.getValue());
-            integralLog.setIntegral(IntegralConstant.CONTINUE_SIGN_IN_INTEGRAL);
-        }else {
+        //是否补签
+        if (isReSignIn){
+            integralLog.setIntegralType(IntegralTypeEnum.REPAIR_SIGN_IN.getValue());
+            integralLog.setIntegral(IntegralConstant.REPAIR_SIGN_IN);
+            integralLog.setBak(IntegralTypeEnum.REPAIR_SIGN_IN.getText());
+        } else {
             integralLog.setIntegralType(IntegralTypeEnum.SIGN_IN.getValue());
             integralLog.setIntegral(IntegralConstant.SIGN_IN);
+            integralLog.setBak(IntegralTypeEnum.SIGN_IN.getText());
+            //是否连续签到
+            if (signInCount % 5 == 0){
+                integralLog.setIntegralType(IntegralTypeEnum.CONTINUOUS_SIGN_IN.getValue());
+                integralLog.setIntegral(IntegralConstant.CONTINUE_SIGN_IN_INTEGRAL);
+            }
         }
 
-        integralLog.setBak(IntegralTypeEnum.SIGN_IN.getText());
         integralLog.setOperationTime(new Date());
         integralLog.setCreateTime(new Date());
         boolean save = integralLogService.save(integralLog);
@@ -85,10 +94,14 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
         Integral integral = lambdaQuery().eq(Integral::getUserId, userId).one();
         if (signInCount % 5 == 0){
             integral.setTotalIntegral(integral.getTotalIntegral() + IntegralConstant.CONTINUE_SIGN_IN_INTEGRAL);
-        }else {
-            integral.setTotalIntegral(integral.getTotalIntegral() + IntegralConstant.SIGN_IN);
         }
-        integral.setSignInToday(1);
+        if (isReSignIn){
+            integral.setTotalIntegral(integral.getTotalIntegral() + IntegralConstant.REPAIR_SIGN_IN);
+            integral.setSignInYesterday(ReSignInEnum.REPAIR_SIGN_IN.getValue());
+        } else {
+            integral.setTotalIntegral(integral.getTotalIntegral() + IntegralConstant.SIGN_IN);
+            integral.setSignInToday(1);
+        }
         integral.setSignInCount(signInCount);
         this.updateById(integral);
         return true;
@@ -120,9 +133,10 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
     @Override
     public int getSignInCount() {
         //日期
-        int day = Integer.parseInt(LocalDate.now().format(DateTimeFormatter.ofPattern("dd")));
+        int day = LocalDate.now().getDayOfMonth();
+        int month = LocalDate.now().getMonthValue();
         //判断redis中是否存在key
-        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), UserContext.getUserId());
+        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), month, UserContext.getUserId());
         Boolean hasKey = stringRedisTemplate.hasKey(signKey);
         if (!hasKey){
             stringRedisTemplate.opsForValue().setBit(signKey, day, false);
@@ -137,16 +151,17 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
         if (num == 0) {
             return 0;
         }
-        //6. 循环遍历
+        //循环遍历
         int count = 0;
         while (true) {
-            //6.1 让这个数字与1 做与运算，得到数字的最后一个bit位 判断这个数字是否为0
+            //让这个数字与1 做与运算，得到数字的最后一个bit位 判断这个数字是否为0
             if ((num & 1) == 0) {
                 //如果为0，签到结束
                 break;
             } else {
                 count++;
             }
+            //移除最后一个bit位
             num >>>= 1;
         }
         return count;
@@ -156,9 +171,10 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
     public int getSignInToday() {
 
         //日期
-        int day = Integer.parseInt(LocalDate.now().format(DateTimeFormatter.ofPattern("dd")));
+        int month = LocalDate.now().getMonthValue();
+        int day = LocalDate.now().getDayOfMonth();
         //判断redis中是否存在key
-        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), UserContext.getUserId());
+        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), month, UserContext.getUserId());
         Boolean hasKey = stringRedisTemplate.hasKey(signKey);
         if (!hasKey){
             stringRedisTemplate.opsForValue().setBit(signKey, day, false);
@@ -171,12 +187,33 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
     }
 
     @Override
+    public int getSignInYesterday() {
+
+        DateTime yesterday = DateUtil.yesterday();
+        //日期
+        int month = yesterday.month() + 1;
+        int day = yesterday.dayOfMonth();
+        //判断redis中是否存在key
+        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), month, UserContext.getUserId());
+        Boolean hasKey = stringRedisTemplate.hasKey(signKey);
+        if (!hasKey){
+            stringRedisTemplate.opsForValue().setBit(signKey, day, false);
+        }
+        //检测是否用户今日签到过,用getBit可以取出该用户具体日期的签到状态(位图的值只有两个,1或者0,这里1代表true)
+        if (stringRedisTemplate.opsForValue().getBit(signKey, day)) {
+            return 2;
+        }
+        return 0;
+    }
+
+    @Override
     public List<Integer> getSignInDates() {
         List<Integer> signInDates = new ArrayList<>();
         //日期
+        int month = LocalDate.now().getMonthValue();
         int day = Integer.parseInt(LocalDate.now().format(DateTimeFormatter.ofPattern("dd")));
         //判断redis中是否存在key
-        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), UserContext.getUserId());
+        String signKey = String.format(RedisConstant.USER_SIGN_IN, LocalDate.now().getYear(), month, UserContext.getUserId());
         Boolean hasKey = stringRedisTemplate.hasKey(signKey);
         if (!hasKey){
             stringRedisTemplate.opsForValue().setBit(signKey, day, false);
@@ -191,9 +228,9 @@ public class IntegralServiceImpl extends ServiceImpl<IntegralMapper, Integral>
         if (num == 0) {
             return Collections.emptyList();
         }
-        //6. 循环遍历
+        //循环遍历
         while (day > 0) {
-            //6.1 让这个数字与1 做与运算，得到数字的最后一个bit位 判断这个数字是否为0
+            //让这个数字与1 做与运算，得到数字的最后一个bit位 判断这个数字是否为0
             if ((num & 1) == 1) {
                 //如果为0，签到结束
                 signInDates.add(day);

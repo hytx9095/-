@@ -12,13 +12,15 @@ import java.util.List;
 */
 public interface IntegralService extends IService<Integral> {
 
-    boolean signIn();
+    boolean signIn(int month, int day, boolean isReSignIn);
     boolean genChartByIntegral(long userId);
     int getSignInCount();
 
     int getSignInToday();
+    int getSignInYesterday();
 
     List<Integer> getSignInDates();
 
     boolean buyIntegral(int price);
+
 }

@@ -1,5 +1,7 @@
 package com.wrbi.springbootinit.controller;
 
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wrbi.springbootinit.common.BaseResponse;
@@ -7,7 +9,6 @@ import com.wrbi.springbootinit.common.ErrorCode;
 import com.wrbi.springbootinit.common.ResultUtils;
 import com.wrbi.springbootinit.common.UserContext;
 import com.wrbi.springbootinit.constant.CommonConstant;
-import com.wrbi.springbootinit.constant.RedisConstant;
 import com.wrbi.springbootinit.exception.BusinessException;
 import com.wrbi.springbootinit.model.dto.integral.BuyIntegralRequest;
 import com.wrbi.springbootinit.model.dto.integralLog.IntegralLogQueryRequest;
@@ -19,7 +20,6 @@ import com.wrbi.springbootinit.service.IntegralLogService;
 import com.wrbi.springbootinit.service.IntegralService;
 import com.wrbi.springbootinit.utils.SqlUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -51,9 +51,14 @@ public class IntegralController {
         int signInCount = integralService.getSignInCount();
         //获取今日签到状态
         int signInToday = integralService.getSignInToday();
-        if (integral.getSignInCount() != signInCount || signInToday != integral.getSignInToday()) {
+        //获取昨日签到状态
+        int signInYesterday = integralService.getSignInYesterday();
+        if (integral.getSignInCount() != signInCount
+                || signInToday != integral.getSignInToday()
+                || signInYesterday != integral.getSignInYesterday()) {
             integral.setSignInCount(signInCount);
             integral.setSignInToday(signInToday);
+            integral.setSignInYesterday(signInYesterday);
             integralService.updateById(integral);
         }
         return ResultUtils.success(integral);
@@ -65,8 +70,26 @@ public class IntegralController {
      * @return
      */
     @PostMapping("/signIn")
-    public BaseResponse<Boolean> saveSignIn() {
-        return ResultUtils.success(integralService.signIn());
+    public BaseResponse<Boolean> signIn() {
+        //获取月份与天数
+        int dayOfMonth = LocalDate.now().getDayOfMonth();
+        int month = LocalDate.now().getMonthValue();
+        return ResultUtils.success(integralService.signIn(month, dayOfMonth, false));
+    }
+
+    /**
+     * 补签
+     *
+     * @return
+     */
+    @PostMapping("/reSignIn")
+    public BaseResponse<Boolean> reSignIn() {
+        //获取昨天日期
+        DateTime yesterdayDate = DateUtil.yesterday();
+        //获取月份与天数
+        int month = yesterdayDate.month() + 1;
+        int dayOfMonth = yesterdayDate.dayOfMonth();
+        return ResultUtils.success(integralService.signIn(month, dayOfMonth, true));
     }
 
     /**
